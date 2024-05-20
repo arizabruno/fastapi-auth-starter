@@ -22,7 +22,7 @@ class TokenData(BaseModel):
     Attributes:
         id (int | None): The user ID associated with the token. Defaults to None.
         username (str | None): The username associated with the token. Defaults to None.
-        is_guest (bool | None): A flag indicating whether the token belongs to a guest user. Defaults to None.
+        role (str | None): The user's roles. Defaults to None.
 
     This schema can be used to validate token payloads or to carry information related to the
     authentication context of a request. It is especially useful for endpoints that need to
@@ -30,4 +30,4 @@ class TokenData(BaseModel):
     """
     id: int | None = None
     username: str | None = None
-    is_guest: bool | None = None
+    roles: str | None = None

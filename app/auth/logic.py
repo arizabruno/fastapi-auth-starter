@@ -65,21 +65,6 @@ def authenticate_user(username: str, password: str) -> Optional[UserInfo]:
         return False
     return user
 
-def authenticate_guest_user(guest_id) -> Optional[UserInfo]:
-    """
-    Authenticate a guest user by verifying their guest_id.
-
-    Args:
-        guest_id (str): The guest_id of the user to authenticate.
-
-    Returns:
-        Optional[UserInfo]: The authenticated user object if authentication is successful, False otherwise.
-    """
-    user = get_user_by_id(guest_id)
-    if not user:
-        return False
-    return user
-
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
@@ -141,19 +126,41 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]) -> Use
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         id = payload.get("user")["id"]
         username: str = payload.get("user")["username"]
-        is_guest: bool = payload.get("user")["is_guest"]
-        if id is None or username is None or is_guest is None:
+        if id is None or username is None:
             raise credentials_exception
-        token_data = TokenData(id=id, username=username, is_guest=is_guest)
+        token_data = TokenData(id=id, username=username)
     except JWTError as error:
         print("JWT Error",error)
         raise credentials_exception
 
-    if token_data.is_guest:
-        user = read_user_by_id(token_data.id)
-    else:
-        user = read_user_by_username(token_data.username)
+    user = read_user_by_id(token_data.id)
 
     if user is None:
         raise credentials_exception
     return user
+
+
+def update_user(user_id: int, email: str, username: str, password: str, roles:str) -> Optional[str]:
+    """
+    Update a user's information in the database.
+
+    Args:
+        user_id (int): The user's id.
+        email (str): The user's email.
+        username (str): The user's username.
+        password (str): The user's password.
+        roles (str): The user's roles.
+    Returns:
+        str: A new access_token if the user's information was updated successfully, None otherwise.
+    """
+
+    success = update_user_info(user_id, email, username, password)
+    if not success:
+        return None
+
+    access_token_expires =  timedelta(days=1)
+    access_token = create_access_token(
+        data={"user":{"id":user_id, "username":username, "email":email, "roles":roles}}, expires_delta=access_token_expires
+    )
+
+    return access_token

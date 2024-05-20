@@ -4,7 +4,6 @@ from app.data_access.queries import *
 from fastapi.middleware.cors import CORSMiddleware
 import os
 from dotenv import load_dotenv
-from app.routers.v1 import movies as v1_movies_routes
 from app.routers.v1 import users as v1_users_routes
 from app.routers import token as token_routes
 
@@ -49,11 +48,4 @@ app.include_router(
     v1_users_routes.router,
     prefix="/api/v1/users",
     tags=[version, "users"]
-)
-
-
-app.include_router(
-    v1_movies_routes.router,
-    prefix="/api/v1/movies",
-    tags=[version, "movies"]
 )
