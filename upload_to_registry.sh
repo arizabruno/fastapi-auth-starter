@@ -3,7 +3,7 @@
 # Variables
 REGION="sa-east-1"
 ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
-REPO_NAME="api"  # name of the ECR repository
+REPO_NAME="namex_api"  # name of the ECR repository
 IMAGE_TAG="latest"  # tag for your docker image
 
 # Create ECR repository if it does not exist

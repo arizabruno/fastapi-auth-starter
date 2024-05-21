@@ -1,5 +1,5 @@
-resource "aws_security_group" "ssh_access" {
-  name        = "ssh-access"
+resource "aws_security_group" "namex_ssh_access" {
+  name        = "namex-ssh-access"
   description = "Allow inbound SSH traffic"
 
   ingress {
@@ -22,8 +22,8 @@ resource "aws_security_group" "ssh_access" {
 }
 
 
-resource "aws_security_group" "api_sg" {
-  name        = "api_security_group"
+resource "aws_security_group" "namex_api_sg" {
+  name        = "namex-api-security-group"
   description = "Security group for FastAPI deployment allowing traffic on port 8080"
 
   ingress {

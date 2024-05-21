@@ -19,12 +19,6 @@ version = "v1.0"
 
 @app.get("/")
 async def main():
-    """
-    Redirects to the API documentation page.
-
-    Returns:
-    - RedirectResponse: Redirects the client to the API documentation.
-    """
     return RedirectResponse(url="/docs")
 
 # CORS Configuration
