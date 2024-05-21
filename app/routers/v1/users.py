@@ -1,4 +1,5 @@
 from typing import List
+from app.utils.email_service import send_email
 from fastapi import BackgroundTasks, Depends, APIRouter, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 from app.auth.logic import get_current_user, update_user
@@ -10,10 +11,10 @@ from app.db.repositories import get_users_repository
 from app.schemas.token import Token
 from datetime import datetime, timedelta, timezone
 
-# Load environment variables from .env file
 load_dotenv()
 
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))
+TEST_SES_RECIPIENT = os.getenv("TEST_SES_RECIPIENT")
 
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
@@ -71,3 +72,10 @@ async def delete_user_endpoint(
     if not success:
         raise HTTPException(status_code=400, detail="User deletion failed.")
     return success
+
+
+# Sends reset pssword email using AWS SES
+@router.post("/reset-password", response_description="Send reset password email")
+async def send_reset_password_email_endpoint(email: str):
+    send_email(email, "Reset your password", "Click here to reset your password: https://example.com/reset-password")
+    return {"message": "Email sent."}
