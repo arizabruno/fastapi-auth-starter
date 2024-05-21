@@ -1,8 +1,10 @@
 from typing import List
+from app.schemas.password import PasswordResetRequest
 from app.utils.email_service import send_email
+from app.utils.reset_password import create_reset_password_token, get_user_id_from_reset_password_token
 from fastapi import BackgroundTasks, Depends, APIRouter, HTTPException
 from fastapi.security import OAuth2PasswordBearer
-from app.auth.logic import get_current_user, update_user
+from app.auth.logic import get_current_user, update_user, update_user_password
 from dotenv import load_dotenv
 import os
 from app.db.users.access import UsersRepository
@@ -15,6 +17,9 @@ load_dotenv()
 
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))
 TEST_SES_RECIPIENT = os.getenv("TEST_SES_RECIPIENT")
+
+RESET_PASSWORD_TOKEN_EXPIRE_MINUTES = int(os.getenv("RESET_PASSWORD_TOKEN_EXPIRE_MINUTES", 15))
+FRONTEND_RESET_PASSWORD_URL = os.getenv("FRONTEND_RESET_PASSWORD_URL")
 
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
@@ -74,8 +79,59 @@ async def delete_user_endpoint(
     return success
 
 
-# Sends reset pssword email using AWS SES
-@router.post("/reset-password", response_description="Send reset password email")
+@router.post("/request-password-reset", response_description="Request password reset")
+async def request_password_reset(
+    email: str,
+    background_tasks: BackgroundTasks,
+    users_repo: UsersRepository = Depends(get_users_repository)
+):
+    # Verify if the email exists
+    user = users_repo.get_user_by_email(email)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Generate a reset token
+    expires_delta = timedelta(minutes=RESET_PASSWORD_TOKEN_EXPIRE_MINUTES)
+    token = create_reset_password_token(data={"user_id": user.user_id}, expires_delta=expires_delta)
+
+    # Construct reset URL
+    reset_url = f"{FRONTEND_RESET_PASSWORD_URL}?token={token}"
+
+    email_content = """
+    Click the link below to reset your password:
+    {url}
+    """
+
+    # Send the reset email
+    background_tasks.add_task(send_email, recipient=email, subject="Reset Password", body_text=email_content.format(url=reset_url))
+
+    return {"msg": "Password reset email sent"}
+
+
+@router.post("/reset-password", response_description="Reset password")
+async def reset_password(
+    request: PasswordResetRequest,
+    users_repo: UsersRepository = Depends(get_users_repository)
+):
+    # Decode the JWT token
+    user_id = get_user_id_from_reset_password_token(request.token)
+    if user_id is None:
+        raise HTTPException(status_code=400, detail="Invalid token")
+
+
+    # Retrieve user by user_id
+    user = users_repo.get_user(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    updated_user = update_user_password(user_id, request.new_password, users_repo)
+
+    if not updated_user:
+        raise HTTPException(status_code=500, detail="Failed to reset password")
+    print("User Password Updated", updated_user)
+    return {"msg": "Password successfully reset"}
+
+@router.post("Test AWS SES", response_description="Sendtest email")
 async def send_reset_password_email_endpoint(email: str):
-    send_email(email, "Reset your password", "Click here to reset your password: https://example.com/reset-password")
+    send_email(email, "Namex Test Email", "Email content here...")
     return {"message": "Email sent."}

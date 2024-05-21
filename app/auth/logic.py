@@ -6,7 +6,7 @@ from app.schemas.token import TokenData
 from app.db.users.access import UsersRepository
 from app.db.users.models import User, UserPublic, UserUpdate
 from app.db.repositories import get_users_repository
-from app.auth.password import oauth2_scheme, verify_password
+from app.auth.password import get_password_hash, oauth2_scheme, verify_password
 from dotenv import load_dotenv
 import os
 
@@ -71,3 +71,8 @@ def update_user(user_id: int, email: str, username: str, password: str, users_re
     )
 
     return access_token
+
+def update_user_password(user_id:int, password: str, users_repo: UsersRepository) -> Optional[UserPublic]:
+    user_update = UserUpdate(password=password)
+    update_result = users_repo.update_user(user_id, user_update)
+    return update_result

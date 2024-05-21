@@ -8,7 +8,7 @@ load_dotenv()
 SES_SENDER = os.getenv("SES_SENDER")
 
 def send_email(recipient, subject, body_text):
-    print("Sending email from {} to {} with subject: {}".format(SES_SENDER, recipient, subject))
+    #print("Sending email from {} to {} with subject: {}".format(SES_SENDER, recipient, subject))
 
     AWS_REGION = "sa-east-1"
     CHARSET = "UTF-8"
