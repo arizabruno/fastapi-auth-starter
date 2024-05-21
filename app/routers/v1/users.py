@@ -1,12 +1,12 @@
-from typing import Annotated, List
+from typing import List
 from fastapi import BackgroundTasks, Depends, APIRouter, HTTPException
 from fastapi.security import OAuth2PasswordBearer
-from app.auth.logic import create_access_token, get_current_user, update_user
-from app.schemas.user import *
-from app.data_access.queries import *
+from app.auth.logic import get_current_user, update_user
 from dotenv import load_dotenv
 import os
-from app.data_access.queries import *
+from app.db.users.access import UsersRepository
+from app.db.users.models import UserPublic, UserCreate, UserUpdate
+from app.db.repositories import get_users_repository
 from app.schemas.token import Token
 from datetime import datetime, timedelta, timezone
 
@@ -18,88 +18,56 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-
-
-@router.post("/", response_description="Create a new user", response_model=bool)
-async def create_user_endpoint(user: UserCreate):
-    """
-    Create a new user with email, username, full name, and hashed password.
-    """
-    result = create_user(user.email, user.username, user.password)
+@router.post("/", response_description="Create a new user", response_model=UserPublic)
+async def create_user_endpoint(
+    user: UserCreate,
+    users_repo: UsersRepository = Depends(get_users_repository)
+):
+    newUser = UserCreate(email=user.email, username=user.username, password=user.password)
+    result = users_repo.create_user(newUser)
     if not result:
         raise HTTPException(status_code=400, detail="User could not be created.")
     return result
 
-@router.get("/", response_description="Read all users",  response_model=List[UserInfo])
-async def read_all_users_endpoint():
-    """
-    Read and return all users.
-    """
-    users = read_all_users()
+@router.get("/", response_description="Read all users", response_model=List[UserPublic])
+async def read_all_users_endpoint(
+    users_repo: UsersRepository = Depends(get_users_repository)
+):
+    users = users_repo.get_users()
     if users is None:
         raise HTTPException(status_code=404, detail="No users found.")
     return users
 
-@router.get("/{user_id}", response_description="Read a user by ID", response_model=UserInfo)
-async def read_user_by_id_endpoint(token: Annotated[str, Depends(oauth2_scheme)], user_id: int):
-    """
-    Read and return a user by their ID.
-
-    Parameters:
-    - token (Annotated[str, Depends(oauth2_scheme)]): The JWT token to validate.
-    - user_id (int): The user's id.
-
-    Returns:
-    - dict: TODO
-
-    Raises:
-    - HTTPException: If the operation fails.
-    """
-    user = read_user_by_id(user_id)
+@router.get("/{user_id}", response_description="Read a user by ID", response_model=UserPublic)
+async def read_user_by_id_endpoint(
+    user_id: int,
+    token: str = Depends(oauth2_scheme),
+    users_repo: UsersRepository = Depends(get_users_repository)
+):
+    user = users_repo.get_user_public(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
     return user
 
-@router.put("/{user_id}", response_description="Update a user's information")
-async def update_user_info_endpoint(current_user: Annotated[UserInfo, Depends(get_current_user)], user: UserUpdate):
-    """
-    Update a user's email, username, full name, or hashed password.
-
-    Parameters:
-    - token (Annotated[str, Depends(oauth2_scheme)]): The JWT token to validate.
-    - user_id (int): The user's id.
-    - user (UserUpdate): The content to be updated.
-
-    Returns:
-    - A new access token.
-
-    Raises:
-    - HTTPException: If the operation fails.
-    """
-    current_user = UserInfo(**current_user)
-    updated_token = update_user(current_user.user_id, user.email or current_user.email, user.username or current_user.username, user.password, current_user.roles)
-
-    if not updated_token:
+@router.put("", response_description="Update a user's information")
+async def update_user_info_endpoint(
+    user: UserUpdate,
+    current_user: UserPublic = Depends(get_current_user),
+    users_repo: UsersRepository = Depends(get_users_repository)
+):
+    updated_token = update_user(current_user.user_id, user.email or current_user.email, user.username or current_user.username, user.password, users_repo)
+    if updated_token is None:
         raise HTTPException(status_code=400, detail="User update failed.")
+    else:
+        return Token(access_token=updated_token, token_type="bearer")
 
-
-@router.delete("/{user_id}", response_description="Delete a user", response_model=bool)
-async def delete_user_endpoint(token: Annotated[str, Depends(oauth2_scheme)], user_id: int):
-    """
-    Delete a user by their ID.
-
-    Parameters:
-    - token (Annotated[str, Depends(oauth2_scheme)]): The JWT token to validate.
-    - user_id (int): The user's id.
-
-    Returns:
-    - dict: A message indicating the outcome of the operation.
-
-    Raises:
-    - HTTPException: If the operation fails.
-    """
-    success = delete_user(user_id)
+@router.delete("/{user_id}", response_description="Delete a user", response_model=UserPublic)
+async def delete_user_endpoint(
+    user_id: int,
+    token: str = Depends(oauth2_scheme),
+    users_repo: UsersRepository = Depends(get_users_repository)
+):
+    success = users_repo.delete_user(user_id)
     if not success:
         raise HTTPException(status_code=400, detail="User deletion failed.")
-
-    return True
+    return success
